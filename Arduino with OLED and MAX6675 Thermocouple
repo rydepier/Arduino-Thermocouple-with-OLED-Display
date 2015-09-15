@@ -1,0 +1,147 @@
+/******************************************************************************
+OLEd Thermocouple Display using U8GLIB Library
+
+visit https://code.google.com/p/u8glib/ for full details of the U8GLIB library and
+full instructions for use.
+
+by Chris Rouse Sept 2015
+
+Using a IIC 128x64 OLED with SSD1306 chip
+ 
+Thermocouple board
+
+Wire OLED:
+  VCC +5v
+  GND GND
+  SDA Analog pin 4
+  SCL Analog pin 5
+Wire Thermocouple max6675:
+// check your pin connections are in this order!!
+  GND to Arduino pinn 2
+  VCC to Arduino pin 3   
+  DO to Arduino pin 4
+  CS to Arduino pin 5
+  CLK to Arduino pin 6
+
+******************************************************************************/
+
+// Add libraries
+  #include "U8glib.h"
+  #include <SPI.h>
+  #include <Wire.h>
+  #include "max6675.h"
+  
+// change between Centigrade and Fahrenheit here
+// REM out the line not needed
+//
+  boolean centigrade = true; //Un REM this for Centigrade and REM out line below
+//  boolean centigrade = false; // Un REM this for Fahrenheit and REM out line above
+//
+  
+// setup u8g object
+  U8GLIB_SSD1306_128X64 u8g(U8G_I2C_OPT_NONE);	// I2C 
+//
+  double max = 215; // maximum temperature
+  double min = -215; // minimum temperature
+  float currentTemp = 0.00;
+  String thisTemp = "";
+  int maxTemp = 0; // maximum temperature reached
+  int minTemp = 0; // minimum temperature reached
+  int pad = 0;
+
+//
+// Thermocouple MAX 6675
+//
+  int thermoDO = 4;
+  int thermoCS = 5;
+  int thermoCLK = 6;
+  MAX6675 thermocouple(thermoCLK, thermoCS, thermoDO);
+  int vccPin = 3;
+  int gndPin = 2;
+//
+//
+void draw(void) {
+  u8g.setFont(u8g_font_profont12);
+  u8g.drawStr(20,10, "Thermocouple");
+  u8g.setFont(u8g_font_profont12); 
+ // show max temp reached 
+  u8g.drawStr(10,25, "max");
+  if(maxTemp <= int(currentTemp)){ maxTemp = int(currentTemp);}
+  thisTemp = String(maxTemp);
+  if(centigrade){
+    thisTemp = thisTemp + "\260C";
+  }
+  else{
+    thisTemp = thisTemp + "\260F";    
+  }
+  const char* maxTempC = (const char*) thisTemp.c_str();
+  u8g.drawStr(30,25, maxTempC); 
+ // show the min temp reached 
+  u8g.drawStr(70,25, "min");
+  if(minTemp >= int(currentTemp)){ minTemp = int(currentTemp);}
+  thisTemp = String(minTemp);
+  if(centigrade){
+    thisTemp = thisTemp + "\260C";
+  }
+  else{
+    thisTemp = thisTemp + "\260F";    
+  }
+  const char* minTempC = (const char*) thisTemp.c_str();
+  u8g.drawStr(90,25, minTempC);  
+ 
+  u8g.setFont(u8g_font_profont29);
+  if(currentTemp > 99){pad = 2;}
+  if(currentTemp > 9 && currentTemp < 100){pad = 10;}
+  if(currentTemp < 10){pad = 18;}  
+  thisTemp = String(currentTemp);
+  if(centigrade){
+    thisTemp = thisTemp + "\260C";
+  }
+  else{
+    thisTemp = thisTemp + "\260F";    
+  } 
+  const char* newDispC = (const char*) thisTemp.c_str(); 
+  u8g.drawStr(pad,50, newDispC);
+}
+
+void setup(void) {
+  Serial.begin(9600);
+  Wire.begin();
+  // use Arduino pins 
+  pinMode(vccPin, OUTPUT); digitalWrite(vccPin, HIGH);
+  pinMode(gndPin, OUTPUT); digitalWrite(gndPin, LOW);  
+  delay(500); // wait for MAX chip to stabilise
+  if(centigrade){
+    currentTemp = thermocouple.readCelsius();
+    minTemp = int(thermocouple.readCelsius());
+    maxTemp = int(thermocouple.readCelsius());    
+  }
+  else{
+    currentTemp = thermocouple.readFahrenheit();   
+    minTemp = int(thermocouple.readFahrenheit());
+    maxTemp = int(thermocouple.readFahrenheit());    
+  }
+
+}
+
+void loop(void) {
+  currentTemp = 0;
+  for(int f = 0; f <25; f++){
+    if(centigrade){
+     currentTemp = thermocouple.readCelsius() + currentTemp; 
+    }
+    else{
+      currentTemp = thermocouple.readFahrenheit() + currentTemp;     
+    }
+  }
+  currentTemp = currentTemp/25;  // averages out 25 readings
+  // picture loop
+  u8g.firstPage();  
+  do {
+    draw();
+  } while( u8g.nextPage() );
+  
+  // rebuild the picture after some delay
+  delay(50);
+}
+
